@@ -9,7 +9,7 @@ The scripts must be executed in the following order:
 3. `3_find_frame_tie.py`: Find the frame tie between the reference frame used in timing and the reference frame defined by the RFC.
 4. `4_apply_frame_tie.py`: Apply the frame tie to convert the VLBI astrometric values to the reference frame used in timing.
 5. `5_find_overlaps.py`: Find the overlaps between a 3-sigma range around the timing- and VLBI-derived astrometric values to create the different trial astrometric solutions.
-6. `6_job_array_bundle.sh`: This is a bash script that parallelizes \texttt{calculate_posterior.py}, running it simultaneously for several different trial astrometric solutions.
+6. `6_job_array_bundle.sh`: This is a bash script that parallelizes `calculate_posterior.py`, running it simultaneously for several different trial astrometric solutions.
 7. `7_consolidate_posteriors.py`: Put all the posteriors (and corresponding trial astrometric solutions) into a single file.
 
 `VLBI_utils.py` contains a series of helper functions that are invoked by the other scripts.
