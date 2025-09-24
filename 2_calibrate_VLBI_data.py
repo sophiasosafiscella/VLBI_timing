@@ -1,16 +1,20 @@
-import pandas as pd
-import numpy as np
-from astropy.coordinates import SkyCoord, ICRS, spherical_to_cartesian, cartesian_to_spherical, Angle
-import astropy.units as u
-import uncertainties
-from uncertainties.unumpy import uarray
+#----------------------------------------------------------------------------------------------------------------------
+# 2) Calibrate the VLBI astrometric positions to the RFC
+#----------------------------------------------------------------------------------------------------------------------
+
 from math import sqrt
-import sys
+
+import astropy.units as u
+import numpy as np
+import pandas as pd
+import uncertainties
+from astropy.coordinates import Angle
+from uncertainties.unumpy import uarray
 
 #---------------------------------------------
 # Read the position of VLBI calibration source
 #---------------------------------------------
-cal = pd.read_table('./data/NG_frame_tie/NG_cal.csv', header=0, index_col=0, sep=',', comment='#')
+cal = pd.read_table('./data/cal.csv', header=0, index_col=0, sep=',', comment='#')
 cal_psr_list = cal.index.tolist()
 
 # Original positions
@@ -34,8 +38,7 @@ dcal_dec_dict = {k:v for k, v in zip(cal_psr_list, dcal_dec)}
 #---------------------------------------------------------------
 # Read in the pulsar VLBI positions in their original catalogues
 #---------------------------------------------------------------
-vlbi_pos = pd.read_table('./data/NG_frame_tie/NG_msp_vlbi.csv', header=0, index_col=0, sep=',', comment='#')
-#vlbi_pos = pd.read_table('./data/original_vlbi_astrometric_data.csv', header=0, index_col=0, sep=',', comment='#')
+vlbi_pos = pd.read_table('./data/msp_vlbi.csv', header=0, index_col=0, sep=',', comment='#')
 NG_psr_list = vlbi_pos.index.tolist()
 
 ra_v = uarray(Angle(vlbi_pos["ra_v"], unit=u.hourangle).rad, Angle(vlbi_pos["ra_ve"], unit=u.hourangle).rad)  # RA from VLBI
@@ -48,7 +51,7 @@ dec_v2 = np.empty(len(dec_v), dtype=uncertainties.core.Variable)
 for psr_name, row in vlbi_pos.iterrows():
 
     if og_cat[psr_name] != "RFC":
-        print(psr_name)
+        print(psr_name + " is not in the RFC reference frame")
         print(row['ra_v'], row['dec_v'])
 
         vlbi_pos.loc[psr_name,'ra_v'] = Angle(Angle(row['ra_v'], unit=u.hourangle).rad + dcal_ra_dict[psr_name].nominal_value, unit=u.rad).to_string(unit=u.hourangle)
@@ -62,5 +65,5 @@ for psr_name, row in vlbi_pos.iterrows():
         vlbi_pos.loc[psr_name,'ra_ve'] = Angle(sqrt(Angle(row['ra_ve'], unit=u.hourangle).rad**2 + rfc_cal_ra_dict[psr_name].std_dev**2 + Angle(0.8 * u.mas).rad**2), unit=u.rad).to_string(unit=u.hourangle)
         vlbi_pos.loc[psr_name,'dec_ve'] = Angle(sqrt(Angle(row['ra_ve'], unit=u.deg).rad**2 + rfc_cal_dec_dict[psr_name].std_dev**2), unit=u.rad).to_string(unit=u.deg)
 
-vlbi_pos.to_csv('./data/new_calibrated_vlbi_astrometric_data.csv')
+vlbi_pos.to_csv('./data/vlbi_astrometric_data_calibrated.csv')
 

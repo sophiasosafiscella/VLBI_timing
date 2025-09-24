@@ -1,3 +1,7 @@
+#----------------------------------------------------------------------------------------------------------------------
+# 4) Apply the frame tie to convert the VLBI astrometric values to the reference frame used in timing
+#----------------------------------------------------------------------------------------------------------------------
+
 import numpy as np
 import pandas as pd
 from astropy.coordinates import Angle, SkyCoord, ICRS
@@ -7,13 +11,13 @@ import astropy.units as u
 from VLBI_utils import Wang_frame_tie
 from uncertainties import ufloat
 
-VLBI_data = pd.read_csv("./data/calibrated_vlbi_astrometric_data.csv", header=0, index_col=0)
+VLBI_data = pd.read_csv("./data/vlbi_astrometric_data_calibrated.csv", header=0, index_col=0)
 PSR_list = VLBI_data.index
 
 correct_proper_motion: bool = False
 
 # Frame tie
-A = pd.read_csv('./data/NG_frame_tie/NG_frame_tie.csv', header=0).to_dict('records')[0]
+A = pd.read_csv('./data/frame_tie.csv', header=0).to_dict('records')[0]
 
 # Make sure Omega is in radians and not mas
 Ax, Ay, Az = Angle(A['Ax'], u.mas).rad, Angle(A['Ay'], u.mas).rad, Angle(A['Az'], u.mas).rad
@@ -100,4 +104,4 @@ for i, PSR in enumerate(PSR_list):
         VLBI_data.loc[PSR, "pmra_ve"] = VLBI_pos_SSB_err.ra.to_string(unit=u.hourangle)
         VLBI_data.loc[PSR, "pmdec_ve"] = VLBI_pos_SSB_err.dec.to_string(unit=u.degree)
 
-VLBI_data.to_csv("./data/frame_tied_vlbi_astrometric_data.csv")
+VLBI_data.to_csv("./data/vlbi_astrometric_data_frame_tied.csv")

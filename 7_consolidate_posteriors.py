@@ -1,3 +1,7 @@
+#----------------------------------------------------------------------------------------------------------------------
+# Put all the posteriors (and corresponding trial astrometric solutions) into a single file
+#----------------------------------------------------------------------------------------------------------------------
+
 import numpy as np
 import pandas as pd
 from glob import glob

@@ -1,13 +1,18 @@
-import pandas as pd
-import numpy as np
-from astropy.coordinates import SkyCoord, ICRS, spherical_to_cartesian, cartesian_to_spherical, Angle
-import astropy.units as u
+#----------------------------------------------------------------------------------------------------------------------
+# 3) Find the frame tie between the reference frame used in timing and the reference frame defined by the RFC
+#----------------------------------------------------------------------------------------------------------------------
+
+import sys
 from math import sqrt, sin, cos
+
+import astropy.units as u
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
 import uncertainties
+from astropy.coordinates import spherical_to_cartesian, Angle
 from uncertainties import ufloat
 from uncertainties.unumpy import uarray
-import statsmodels.api as sm
-import sys
 
 
 def to_uarray(array):
@@ -27,8 +32,7 @@ def diff_pos(ra: float, dec: float):
 #---------------------------------------------
 # Read the position of VLBI calibration source
 #---------------------------------------------
-path: str = './data/NG_frame_tie/'
-cal = pd.read_table(path + 'NG_cal.csv', header=0, index_col=0, sep=',', comment='#')
+cal = pd.read_table('./data/cal.csv', header=0, index_col=0, sep=',', comment='#')
 
 # Original positions
 og_cat = cal["og_cat"]
@@ -46,7 +50,7 @@ dcal_dec = rfc_cal_dec - og_cal_dec
 #---------------------------------------------
 # Read in the pulsar VLBI positions in their original catalogues
 #---------------------------------------------
-vlbi_pos = pd.read_table(path + 'NG_msp_vlbi.csv', header=0, index_col=0, sep=',', comment='#')
+vlbi_pos = pd.read_table('./data/msp_vlbi.csv', header=0, index_col=0, sep=',', comment='#')
 psr_names = vlbi_pos.index.tolist()
 N_pulsars: int = len(psr_names)
 
@@ -59,7 +63,6 @@ dec_v2 = np.empty(len(dec_v), dtype=uncertainties.core.Variable)
 # Calibrate positions to RFC
 for i, (index, row) in enumerate(cal.iterrows()):
     if row['og_cat'] != "RFC":
-        print("Calibrating " + index + " to RFC")
         ra_v2[i] = to_ufloat(ra_v[i] + dcal_ra[i])     # RA from VLBI in RFC
         dec_v2[i] = to_ufloat(dec_v[i] + dcal_dec[i])  # DEC from VLBI in RFC
     else:
@@ -68,12 +71,12 @@ for i, (index, row) in enumerate(cal.iterrows()):
 
 # change the error bar of 0437 and do not correct the uncertainties for the other pulsars
 for i in range(N_pulsars):
-   if vlbi_pos.index.tolist()[i] == 'J0437-4715':
-       ra_v2[i].std_dev = sqrt(ra_v[i].std_dev**2 + rfc_cal_ra[i].std_dev**2 + Angle(0.8 * u.mas).rad**2)
-       dec_v2[i].std_dev = sqrt(dec_v[i].std_dev**2 + rfc_cal_dec[i].std_dev**2)
-   else:
-       ra_v2[i].std_dev = ra_v[i].std_dev       # "We did not correct the published uncertainties to those in ICRF2"
-       dec_v2[i].std_dev = dec_v[i].std_dev
+    if vlbi_pos.index.tolist()[i] == 'J0437-4715':
+        ra_v2[i].std_dev = sqrt(ra_v[i].std_dev**2 + rfc_cal_ra[i].std_dev**2 + Angle(0.8 * u.mas).rad**2)
+        dec_v2[i].std_dev = sqrt(dec_v[i].std_dev**2 + rfc_cal_dec[i].std_dev**2)
+    else:
+        ra_v2[i].std_dev = ra_v[i].std_dev       # "We did not correct the published uncertainties to those in ICRF2"
+        dec_v2[i].std_dev = dec_v[i].std_dev
 
 # Turn the VLBI positions into dictionaries
 ra0 = {k: v for k, v in zip(psr_names, ra_v2)}    # This seems to agree with Wang's
@@ -82,7 +85,8 @@ dec0 = {k: v for k, v in zip(psr_names, dec_v2)}  # This seems to agree with Wan
 #---------------------------------------------
 # Read in timing positions
 #---------------------------------------------
-timing_pos = pd.read_table(path + 'NG_msp_timing.csv', header=0, index_col=0, sep=',', comment='#')
+
+timing_pos = pd.read_table('./data/timing_astrometric_data_updated.csv', header=0, index_col=0, sep=',', comment='#')
 psr_t_names = timing_pos.index.tolist()
 psr_list = timing_pos.index.unique().tolist()
 
@@ -104,9 +108,6 @@ for j, ephem in enumerate(timing_pos['ephem'].unique()):
     dect_dms = timing_pos.loc[timing_pos['ephem'] == ephem, 'dec_t']
     dect_dict = {k: v for k, v in zip(dect_dms.index.tolist(), Angle(dect_dms.values, unit=u.degree).rad)}
     dect_diff = Angle([dect_dict[psr] - dec0[psr].nominal_value for psr in psr_list], unit=u.rad).to(u.mas).value
-
-    print(rat_diff)
-    print(dect_diff)
 
     rat_err = timing_pos.loc[timing_pos['ephem'] == ephem, 'ra_te']
     rat_err = {k: v for k, v in zip(rat_err.index.tolist(), Angle(rat_err.values, unit=u.hourangle).to(u.mas).value)}
@@ -141,4 +142,4 @@ for j, ephem in enumerate(timing_pos['ephem'].unique()):
 #    print([gls_model.params])
     print(gls_model.cov_params())
 
-    pd.DataFrame([gls_model.params], columns=['Ax', 'Ay', 'Az']).to_csv("./data/NG_frame_tie/NG_frame_tie.csv", index=False)
+pd.DataFrame([gls_model.params], columns=['Ax', 'Ay', 'Az']).to_csv("./data/frame_tie.csv", index=False)

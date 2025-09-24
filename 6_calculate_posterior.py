@@ -1,26 +1,25 @@
+#----------------------------------------------------------------------------------------------------------------------
+# Calculate the posterior for each trial astrometric solution
+#----------------------------------------------------------------------------------------------------------------------
+
+import glob
 import os
 import sys
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-from scipy.linalg import LinAlgError
-
-import numpy as np
-import pandas as pd
-
-from pint.toa import get_TOAs
-from pint.models import get_model
-from pint.residuals import Residuals
-import pint.fitter
-from pint_pal import noise_utils
 
 import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pint.fitter
+import seaborn as sns
 from astropy.time import Time
+from pint.models import get_model
+from pint.residuals import Residuals
+from pint.toa import get_TOAs
+from pint_pal import noise_utils
 from uncertainties import unumpy
 
 from VLBI_utils import calculate_lnprior, replace_params, epoch_scrunch
-import glob
-import sys
 
 
 def calculate_post(PSR_name: str, timing_solution, timfile: str, parfile: str, VLBI_astrometric_data_file, resume=True, plot=False):
@@ -73,11 +72,6 @@ def calculate_post(PSR_name: str, timing_solution, timfile: str, parfile: str, V
         final_fit_model = get_model(new_par_file)  # Ecliptical coordiantes
         final_fit_resids = pint.residuals.Residuals(toas=toas, model=final_fit_model)
         print("New model loaded from file")
-#        newmodel_eq = ec_timing_model.as_ICRS(epoch=newmodel_ec.POSEPOCH.value)
-#        newmodel_with_noise = noise_utils.add_noise_to_model(newmodel_eq, save_corner=False, base_dir=chains_dir)
-#        final_fit = pint.fitter.DownhillGLSFitter(toas, newmodel_with_noise)
-#        final_fit.fit_toas()
-#        final_fit_model = final_fit.model
 
     else:
         # Perform initial fit
@@ -90,11 +84,6 @@ def calculate_post(PSR_name: str, timing_solution, timfile: str, parfile: str, V
         except:
             print("Fitting new timing solution failed")
             return initial_fit.resids.lnlikelihood()
-#            return [[0.0]]
-
-
-    #    except LinAlgError:
-    #        print(f"LinAlgError at iteration {timing_solution.Index}")
 
         # Re-run noise
         print("Re-running noise")
@@ -144,12 +133,6 @@ def calculate_post(PSR_name: str, timing_solution, timfile: str, parfile: str, V
     ng15_res = np.load(posteriors_dir + "/ng15_res.npy", allow_pickle=True)
     res_diff = ng15_res - new_res
 
-
-    #            return [[0.0]]
-#        except LinAlgError:
-#            print(f"LinAlgError at iteration {timing_solution.Index}")
-#            return [[0.0]]
-
     # Calculate the posterior for this model and TOAs
     ln_prior = calculate_lnprior(final_fit_model, VLBI_astrometric_data_file, PSR_name)
     ln_likelihood = final_fit_resids.lnlikelihood()
@@ -182,8 +165,6 @@ def calculate_post(PSR_name: str, timing_solution, timfile: str, parfile: str, V
 
 if __name__ == "__main__":
     PSR_name, idx, RAJ, DECJ, PX, PMRA, PMDEC, POSEPOCH = sys.argv[1:]  # Timing solution index and parameters
-    #PSR_name, idx, RAJ, DECJ, PX, PMRA, PMDEC, POSEPOCH = "J0030+0451", 0, "0:30:27.4249447", "4:51:39.7153", 2.8773835086748143, -6.2578345561116056, 0.06706353456507053, 57849.0
-    #PSR_name, idx, RAJ, DECJ, PX,  PMRA, PMDEC = "J0030+0451", 1400, "0:30:27.42512704", "4:51:39.7153", 2.8773835086748143, -6.2578345561116056, 0.06706353456507053
 
     print(PSR_name, idx, RAJ, DECJ, PX, PMRA, PMDEC, POSEPOCH)
 

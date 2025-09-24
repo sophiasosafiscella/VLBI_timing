@@ -1,3 +1,8 @@
+#----------------------------------------------------------------------------------------------------------------------
+# Find the overlaps between a 3-sigma range around the timing- and VLBI-derived astrometric values to create the
+# different trial astrometric solutions.
+#----------------------------------------------------------------------------------------------------------------------
+
 import sys
 from itertools import product
 
@@ -115,24 +120,6 @@ def find_solutions(PSR_name, VLBI_data, timing_data, factor: int = 3, grid_num: 
     DECJ_overlap, DECJ_values = overlap_range(timing_DECJ, VLBI_DECJ, factor, grid_num)
 
 #    plot_overlap("DECJ", DECJ_values, timing_DECJ, VLBI_DECJ, fig, 1, 2)
-
-    '''
-    # ------------------------------PMRA------------------------------
-    PMRA_overlap, PMRA_values = asymmetrical_overlap_range(eq_timing_model.PMRA.value,
-                                                           eq_timing_model.PMRA.uncertainty.value,
-                                                           eq_timing_model.PMRA.uncertainty.value,
-                                                           data.loc[PSR_name, "VLBI_PMRA"],
-                                                           data.loc[PSR_name, "VLBI_PMRA_uL"],
-                                                           data.loc[PSR_name, "VLBI_PMRA_uR"], factor, grid_num)
-
-    # ------------------------------PMDEC------------------------------
-    PMDEC_overlap, PMDEC_values = asymmetrical_overlap_range(eq_timing_model.PMDEC.value,
-                                                           eq_timing_model.PMDEC.uncertainty.value,
-                                                           eq_timing_model.PMDEC.uncertainty.value,
-                                                           data.loc[PSR_name, "VLBI_PMDEC"],
-                                                           data.loc[PSR_name, "VLBI_PMDEC_uL"],
-                                                           data.loc[PSR_name, "VLBI_PMDEC_uR"], factor, grid_num)
-    '''
 
     # ------------------------------Proper Motion------------------------------
     # Timing
@@ -289,7 +276,6 @@ def find_solutions(PSR_name, VLBI_data, timing_data, factor: int = 3, grid_num: 
         verticalalignment='top', c=timing_color, alpha=1)
 
         x, y = pdf_values(x0=VLBI_PX_x0, uL=VLBI_PX_uL, uR=VLBI_PX_uR, factor=factor, num=grid_num)
-#        fig.add_trace(go.Scatter(x=x, y=y, name="VLBI", fill='tozeroy', fillcolor=VLBI_color, mode='none'))
         ax.plot(x, y, color=VLBI_color, zorder=10)
         ax.fill_between(x, y, color=VLBI_color, zorder=10, label="VLBI")
         ax.axvline(x=VLBI_PX_x0 - factor * VLBI_PX_uL, lw=3, ls='--', alpha=1, c=VLBI_color)
@@ -346,7 +332,7 @@ if __name__ == "__main__":
 
     print(f"Finding the possible timing solutions for {PSR_name}")
 
-    # FIND THE OVERLAP BETWEEN THE TIMING AND V LBI SOLUTIONS
+    # FIND THE OVERLAP BETWEEN THE TIMING AND VLBI SOLUTIONS
     solutions = find_solutions(PSR_name, VLBI_astrometric_data, timing_astrometric_data, grid_num=100, plot=True)
 
     if solutions:
@@ -354,5 +340,4 @@ if __name__ == "__main__":
         overlap_df[['PMRA', 'PMDEC']] = pd.DataFrame(overlap_df['PM'].tolist(), index=overlap_df.index)
         overlap_df = overlap_df.drop(columns=['PM'])
         overlap_df['POSEPOCH'] = timing_astrometric_data.loc[PSR_name, "epoch_t"]
-#            overlap_df.to_pickle(f"./results/frame_tie/{PSR_name}_overlap_frame_tie.pkl")
-#        overlap_df.to_csv(f"./results/frame_tie/{PSR_name}_overlap_frame_tie.txt", sep=" ", header=True, index_label="ArrayTaskID")
+        overlap_df.to_csv(f"./results/frame_tie/{PSR_name}_overlap_frame_tie.txt", sep=" ", header=True, index_label="ArrayTaskID")
