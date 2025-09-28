@@ -14,7 +14,7 @@ from uncertainties import ufloat
 VLBI_data = pd.read_csv("./data/vlbi_astrometric_data_calibrated.csv", header=0, index_col=0)
 PSR_list = VLBI_data.index
 
-correct_proper_motion: bool = False
+correct_proper_motion: bool = True
 
 # Frame tie
 A = pd.read_csv('./data/frame_tie.csv', header=0).to_dict('records')[0]
