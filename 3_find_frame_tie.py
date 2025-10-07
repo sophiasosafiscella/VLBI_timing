@@ -11,9 +11,10 @@ import pandas as pd
 import statsmodels.api as sm
 import uncertainties
 from astropy.coordinates import spherical_to_cartesian, Angle
+from VLBI_utils import handle_error
 from uncertainties import ufloat
 from uncertainties.unumpy import uarray
-
+import os
 
 def to_uarray(array):
     nominal_values = [array[i].nominal_value for i in range(len(array))]
@@ -28,59 +29,78 @@ def to_ufloat(x):
 def diff_pos(ra: float, dec: float):
     return  [[-sin(ra) * cos(dec), -1.0 * cos(ra) * sin(dec)], [cos(ra) * cos(dec), -1.0 * sin(ra) * sin(dec)], [0, cos(dec)]]
 
+calibrated_data_file: str = './data/vlbi_astrometric_data_calibrated.csv'
+if not os.path.isfile(calibrated_data_file):
+    #---------------------------------------------
+    # Read the position of VLBI calibration source
+    #---------------------------------------------
+    cal_data = pd.read_table('./data/full_cal_data.csv', header=0, index_col=0, sep=',', comment='#')
 
-#---------------------------------------------
-# Read the position of VLBI calibration source
-#---------------------------------------------
-cal = pd.read_table('./data/cal.csv', header=0, index_col=0, sep=',', comment='#')
+    # Original positions
+    og_cal_ra = uarray(Angle(cal_data["og_cal_ra"], unit=u.hourangle).rad, Angle(cal_data["og_cal_rae"], unit=u.mas).rad)
+    og_cal_dec = uarray(Angle(cal_data["og_cal_dec"], unit=u.degree).rad, Angle(cal_data["og_cal_dece"], unit=u.mas).rad)
 
-# Original positions
-og_cat = cal["og_cat"]
-og_cal_ra = uarray(Angle(cal["og_cal_ra"], unit=u.hourangle).rad, Angle(cal["og_cal_rae"], unit=u.hourangle).rad)
-og_cal_dec = uarray(Angle(cal["og_cal_dec"], unit=u.degree).rad, Angle(cal["og_cal_dece"], unit=u.arcsec).rad)
+    # Positions in RFC
+    rfc_cal_ra = uarray(Angle(cal_data["RFC_cal_ra"], unit=u.hourangle).rad, Angle(cal_data["RFC_cal_rae"], unit=u.mas).rad)
+    rfc_cal_dec = uarray(Angle(cal_data["RFC_cal_dec"], unit=u.degree).rad, Angle(cal_data["RFC_cal_dece"], unit=u.mas).rad)
 
-# Positions in RFC
-rfc_cal_ra = uarray(Angle(cal["RFC_cal_ra"], unit=u.hourangle).rad, Angle(cal["RFC_cal_rae"], unit=u.hourangle).rad)
-rfc_cal_dec = uarray(Angle(cal["RFC_cal_dec"], unit=u.degree).rad, Angle(cal["RFC_cal_dece"], unit=u.arcsec).rad)
+    # Calculate the offsets between the original positions and RFC
+    dcal_ra = rfc_cal_ra - og_cal_ra
+    dcal_dec = rfc_cal_dec - og_cal_dec
 
-# Calculate the offsets between the original positions and RFC
-dcal_ra = rfc_cal_ra - og_cal_ra
-dcal_dec = rfc_cal_dec - og_cal_dec
+    #---------------------------------------------
+    # Read in the pulsar VLBI positions in their original catalogues
+    #---------------------------------------------
+    vlbi_pos = pd.read_table('./data/msp_vlbi.csv', header=0, index_col=0, sep=',', comment='#')
+    psr_names = vlbi_pos.index.tolist()
+    N_pulsars: int = len(psr_names)
 
-#---------------------------------------------
-# Read in the pulsar VLBI positions in their original catalogues
-#---------------------------------------------
-vlbi_pos = pd.read_table('./data/msp_vlbi.csv', header=0, index_col=0, sep=',', comment='#')
-psr_names = vlbi_pos.index.tolist()
-N_pulsars: int = len(psr_names)
+    # Original VLBI positions
+    ra = Angle(vlbi_pos["ra_v"], unit=u.hourangle)
+    dec = Angle(vlbi_pos["dec_v"], unit=u.degree)
+    ra_err = Angle([handle_error(vlbi_pos['ra_ve'].to_numpy()[i], dec[i].degree) for i in range(N_pulsars)], unit=u.mas)
+    dec_err = Angle([handle_error(vlbi_pos['dec_ve'].to_numpy()[i]) for i in range(N_pulsars)], unit=u.mas)
 
-ra_v = uarray(Angle(vlbi_pos["ra_v"], unit=u.hourangle).rad, Angle(vlbi_pos["ra_ve"], unit=u.hourangle).rad)  # RA from VLBI
-dec_v = uarray(Angle(vlbi_pos["dec_v"], unit=u.degree).rad, Angle(vlbi_pos["dec_ve"], unit=u.arcsec).rad)     # DEC from VLBI
+    ra_v = uarray(ra.rad, ra_err.rad)     # RA from VLBI
+    dec_v = uarray(dec.rad, dec_err.rad)     # DEC from VLBI
 
-ra_v2 = np.empty(len(ra_v), dtype=uncertainties.core.Variable)
-dec_v2 = np.empty(len(dec_v), dtype=uncertainties.core.Variable)
+    # Calibrated VLBI positions
+    ra_v2 = np.full(len(ra_v), uarray(0.0, 0.0), dtype=uncertainties.core.Variable)
+    dec_v2 = np.full(len(dec_v), uarray(0.0, 0.0), dtype=uncertainties.core.Variable)
 
-# Calibrate positions to RFC
-for i, (index, row) in enumerate(cal.iterrows()):
-    if row['og_cat'] != "RFC":
-        ra_v2[i] = to_ufloat(ra_v[i] + dcal_ra[i])     # RA from VLBI in RFC
-        dec_v2[i] = to_ufloat(dec_v[i] + dcal_dec[i])  # DEC from VLBI in RFC
-    else:
-        ra_v2[i] = ra_v[i]
-        dec_v2[i] = dec_v[i]
+    # Calibrate positions to RFC
+    for i, (index, row) in enumerate(cal_data.iterrows()):
+        if row['og_cat'] != "RFC":
+            ra_v2[i] = to_ufloat(ra_v[i] + dcal_ra[i])     # RA from VLBI in RFC
+            dec_v2[i] = to_ufloat(dec_v[i] + dcal_dec[i])  # DEC from VLBI in RFC
+        else:
+            ra_v2[i] = ra_v[i]
+            dec_v2[i] = dec_v[i]
 
-# change the error bar of 0437 and do not correct the uncertainties for the other pulsars
-for i in range(N_pulsars):
-    if vlbi_pos.index.tolist()[i] == 'J0437-4715':
-        ra_v2[i].std_dev = sqrt(ra_v[i].std_dev**2 + rfc_cal_ra[i].std_dev**2 + Angle(0.8 * u.mas).rad**2)
-        dec_v2[i].std_dev = sqrt(dec_v[i].std_dev**2 + rfc_cal_dec[i].std_dev**2)
-    else:
-        ra_v2[i].std_dev = ra_v[i].std_dev       # "We did not correct the published uncertainties to those in ICRF2"
-        dec_v2[i].std_dev = dec_v[i].std_dev
+    # change the error bar of 0437 and do not correct the uncertainties for the other pulsars
+    for i in range(N_pulsars):
+        if vlbi_pos.index.tolist()[i] == 'J0437-4715':
+            ra_v2[i].std_dev = sqrt(ra_v[i].std_dev**2 + rfc_cal_ra[i].std_dev**2 + Angle(0.8 * u.mas).rad**2)
+            dec_v2[i].std_dev = sqrt(dec_v[i].std_dev**2 + rfc_cal_dec[i].std_dev**2)
+        else:
+            ra_v2[i].std_dev = ra_v[i].std_dev       # "We did not correct the published uncertainties to those in ICRF2"
+            dec_v2[i].std_dev = dec_v[i].std_dev
 
-# Turn the VLBI positions into dictionaries
-ra0 = {k: v for k, v in zip(psr_names, ra_v2)}    # This seems to agree with Wang's
-dec0 = {k: v for k, v in zip(psr_names, dec_v2)}  # This seems to agree with Wang's
+    # Turn the VLBI positions into dictionaries
+    ra0 = {k: v for k, v in zip(psr_names, ra_v2)}    # This seems to agree with Wang's
+    dec0 = {k: v for k, v in zip(psr_names, dec_v2)}  # This seems to agree with Wang's
+
+else:
+    vlbi_pos = pd.read_table(calibrated_data_file, header=0, index_col=0, sep=',', comment='#')
+    psr_names = vlbi_pos.index.tolist()
+    N_pulsars: int = len(psr_names)
+
+    ra_v2 = uarray(Angle(vlbi_pos['ra_v']).rad, Angle(vlbi_pos['ra_ve']).rad)
+    dec_v2 = uarray(Angle(vlbi_pos['dec_v']).rad, Angle(vlbi_pos['dec_ve']).rad)
+
+    # Turn the VLBI positions into dictionaries
+    ra0 = {k: v for k, v in zip(psr_names, ra_v2)}    # This seems to agree with Wang's
+    dec0 = {k: v for k, v in zip(psr_names, dec_v2)}  # This seems to agree with Wang's
 
 #---------------------------------------------
 # Read in timing positions
@@ -102,7 +122,7 @@ for j, ephem in enumerate(timing_pos['ephem'].unique()):
     Ct, Cv = np.zeros((2 * N_pulsars, 2 * N_pulsars)), np.zeros((2 * N_pulsars, 2 * N_pulsars))
 
     rat_hms= timing_pos.loc[timing_pos['ephem'] == ephem, 'ra_t']
-    rat_dict = {k: v for k, v in zip(rat_hms.index.tolist(), Angle(rat_hms.values, unit=u.hourangle).rad)}
+    rat_dict = {k: v for k, v in zip(rat_hms.index.tolist(), Angle(rat_hms.values, unit=u.hourangle).to(u.mas).rad)}
     rat_diff = Angle([rat_dict[psr] - ra0[psr].nominal_value for psr in psr_list], unit=u.rad).to(u.mas).value
 
     dect_dms = timing_pos.loc[timing_pos['ephem'] == ephem, 'dec_t']
@@ -110,10 +130,10 @@ for j, ephem in enumerate(timing_pos['ephem'].unique()):
     dect_diff = Angle([dect_dict[psr] - dec0[psr].nominal_value for psr in psr_list], unit=u.rad).to(u.mas).value
 
     rat_err = timing_pos.loc[timing_pos['ephem'] == ephem, 'ra_te']
-    rat_err = {k: v for k, v in zip(rat_err.index.tolist(), Angle(rat_err.values, unit=u.hourangle).to(u.mas).value)}
+    rat_err = {k: v for k, v in zip(rat_err.index.tolist(), Angle(rat_err.values).value)}
 
     dect_err = timing_pos.loc[timing_pos['ephem'] == ephem, 'dec_te']
-    dect_err = {k: v for k, v in zip(dect_err.index.tolist(), Angle(dect_err.values, unit=u.deg).to(u.mas).value)}
+    dect_err = {k: v for k, v in zip(dect_err.index.tolist(), Angle(dect_err.values).value)}
 
     cor = timing_pos.loc[timing_pos['ephem'] == ephem, 'cor']
     rdcorc = {k: v for k, v in zip(cor.index.tolist(), cor.values)}

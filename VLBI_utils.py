@@ -12,8 +12,81 @@ from pypulse.utils import weighted_moments
 from scipy.stats import norm, skewnorm
 from uncertainties import ufloat, umath
 from math import log as ln
+import math
 
 import sys
+
+def handle_error(error, dec_degrees=None):
+    """
+    Handles errors in right ascension (RA) or declination (DEC) by converting them to milliarcseconds (mas)
+    based on the input unit (seconds, mas, or arcseconds).
+
+    Parameters
+    ----------
+    error : list
+        A list where the first element is the error value as a string and the last
+        element specifies the unit of the error ('seconds', 'mas', or 'arcsec').
+
+    dec_degrees : float
+        Declination in degrees, used for conversion in specific cases.
+
+    Returns
+    -------
+    astropy.coordinates.Angle
+        The error in RA converted to milliarcseconds.
+
+    Raises
+    ------
+    SystemExit
+        If the unit specified in the `error` list is not 'seconds', 'mas', or
+        'arcsec'.
+    """
+
+    error_parts = error.strip().split()
+    if len(error_parts) == 1:
+        raise ValueError(f"Invalid error format: '{error}' — must include a unit.")
+    error_val, units = error_parts
+    error_val_float = float(error_val)
+
+    if units == 'seconds':
+        if dec_degrees is None:
+            sys.exit("Declination in degrees is required to convert RA error from seconds to mas.")
+        # Conversion: error_mas = error_s * 15 * 1000 * cos(dec)
+        return Angle((error_val_float * 15000 * np.cos(np.deg2rad(dec_degrees))), unit=u.mas)
+    elif units == 'mas':
+        return Angle(float(error_val_float), unit=u.mas)
+    elif units == 'arcsec':
+        return Angle(float(error_val_float), unit=u.arcsec).to(u.mas)
+    else:
+        sys.exit(f"The units of the error in RA must be mas, or arcsec, but {units} was provided")
+
+def ra_error_to_mas(ra_error_seconds, dec_degrees):
+    """
+    Convert a right ascension error from seconds of time to milliarcseconds (mas).
+
+    Parameters
+    ----------
+    ra_error_seconds : float
+        Right ascension error in seconds of time.
+    dec_degrees : float
+        Declination in degrees.
+
+    Returns
+    -------
+    float
+        Equivalent angular error on the sky in milliarcseconds.
+    """
+    # Convert declination to radians
+    dec_rad = math.radians(dec_degrees)
+
+    # 1 second of RA = 15 arcseconds on the sky at Dec = 0
+    # But the actual projected angular distance is smaller by cos(Dec)
+    ra_error_arcsec = 15.0 * ra_error_seconds * math.cos(dec_rad)
+
+    # Convert arcseconds → milliarcseconds
+    ra_error_mas = ra_error_arcsec * 1000.0
+
+    return ra_error_mas
 
 def umath_spherical_to_cartesian(spherical):
     """Converts spherical coordinates (rho, ra, dec) to Cartesian coordinates (x, y, z),"""

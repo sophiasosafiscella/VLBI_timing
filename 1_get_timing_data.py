@@ -10,7 +10,8 @@ from pint.models import get_model
 from pint.toa import get_TOAs
 import astropy.units as u
 from astropy.time import Time
-from astropy.coordinates import Angle
+from astropy.coordinates import Angle, SkyCoord
+from VLBI_utils import ra_error_to_mas
 from math import sqrt
 import glob
 
@@ -22,11 +23,11 @@ new_epochs = VLBI_data['epoch_v'].to_numpy()
 RA_list, RA_err_list, DEC_list, DEC_err_list, EPHEM_list, equinox_list = [np.empty(n_psr, dtype=object) for _ in range(6)]
 PMRA_list, PMRA_err_list, PMDEC_list, PMDEC_err_list, PX_list, PX_err_list = [np.empty(n_psr, dtype=float) for _ in range(6)]
 POSEPOCH_list = np.empty(n_psr, dtype=float)
-corr_list = np.empty(n_psr, dtype=float)
+corr_list = np.full(n_psr, np.nan)
 
 for k, psr in enumerate(PSR_list):
 
-    print("Processing PSR", psr)
+    print(f"Processing PSR {psr}", flush=True)
     PSR_name = psr + "_PINT"
     # Names of the .tim and .par files
     timfile: str = glob.glob(f"./data/NG_15yr_dataset/tim/{PSR_name}*tim")[0]
@@ -37,20 +38,25 @@ for k, psr in enumerate(PSR_list):
     eq = ec_timing_model.as_ICRS(epoch=ec_timing_model.POSEPOCH.value)  # Equatorial coordinates
 
     # Compute time difference
-    time_diff = Time(new_epochs[k], format='mjd') - Time(eq.POSEPOCH.value, format='mjd')  # This is a TimeDelta object
-    timespan_in_years = time_diff.to_value('year') * u.year
+    timespan_in_years = (Time(new_epochs[k], format='mjd') - Time(eq.POSEPOCH.value, format='mjd')).to_value('year')
 
     # Update the epoch to match that of VLBI
     eq.change_posepoch(new_epochs[k])
 
     # Update positions
-    RA_list[k] = eq.RAJ.quantity
-    DEC_list[k] = eq.DECJ.quantity
+    pos = SkyCoord(ra=eq.RAJ.quantity, dec=eq.DECJ.quantity, unit=(u.hourangle, u.deg))
+    RA_list[k] = pos.ra.to_string(unit=u.hourangle)
+    DEC_list[k] = pos.dec.to_string(unit=u.deg)
 
     # Update uncertainties, taking into account that when we apply proper motion,
     # the components of proper motion also have errors that will be propagated into the positions
-    RA_err_list[k] = Angle(sqrt(Angle(eq.RAJ.uncertainty, unit=u.hourangle).rad**2 + Angle(eq.PMRA.uncertainty * timespan_in_years, unit=u.mas).rad**2), unit=u.rad).to_string(unit=u.hourangle)
-    DEC_err_list[k] = Angle(sqrt(Angle(eq.DECJ.uncertainty, unit=u.degree).rad**2 + Angle(eq.PMDEC.uncertainty * timespan_in_years, unit=u.mas).rad**2), unit=u.rad).to_string(unit=u.degree)
+
+    RA_err_mas = ra_error_to_mas(eq.RAJ.uncertainty.hms[-1], pos.dec.degree)
+    RA_err_total_mas = sqrt(RA_err_mas ** 2 +(eq.PMRA.uncertainty.value * timespan_in_years) ** 2)
+    RA_err_list[k] = RA_err_total_mas * u.mas
+
+    DEC_err_total_mas = sqrt((eq.DECJ.uncertainty.to(u.mas).value) ** 2 + (eq.PMDEC.uncertainty.value * timespan_in_years) ** 2)
+    DEC_err_list[k] = DEC_err_total_mas * u.mas
 
     PMRA_list[k] = eq.PMRA.value
     PMRA_err_list[k] = eq.PMRA.uncertainty.value

@@ -16,8 +16,8 @@ from VLBI_utils import pdf_values, Wang_frame_tie
 from uncertainties import ufloat, umath
 import sys
 
-VLBI_data = pd.read_csv("./data/vlbi_astrometric_data_frame_tied.csv", header=0, index_col=0)
-timing_data = pd.read_csv("./data/timing_astrometric_data_updated.csv", header=0, index_col=0)
+VLBI_data = pd.read_csv("../data/vlbi_astrometric_data_frame_tied.csv", header=0, index_col=0)
+timing_data = pd.read_csv("../data/timing_astrometric_data_updated.csv", header=0, index_col=0)
 PSR_list = ["J0030+0451", "J1640+2224", "J1730-2304", "J2010-1323", "J2145-0750", "J2317+1439"]
 sns.set(context="paper", style="ticks", font_scale=3.2)
 sns.set_palette(plotly.colors.qualitative.Plotly)
@@ -191,5 +191,5 @@ plt.subplots_adjust(
     wspace=0, hspace=0.05
 )
 
-fig.savefig(f"./figures/PDFs_frametie_matplotlib_paper.pdf")
+#fig.savefig(f"./figures/PDFs_frametie_matplotlib_paper.pdf")
 fig.show()
