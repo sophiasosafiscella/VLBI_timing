@@ -1,6 +1,10 @@
-This is a GitHub repository for the source code used in the publication titled "The NANOGrav 15-Year Data Set: Improved Timing Precision With VLBI Astrometric Priors".
+This is a GitHub repository for the source code used in the publication titled "The NANOGrav 15-Year Data Set: Improved Timing Precision With VLBI Astrometric Priors."
 
-Our software scripts and the input data files are available from our GitHub repository (https://github.com/sophiasosafiscella/VLBI_sporc). Our Python code requires the `astropy`, `PINT`, and `uncertainties` packages. The input `.par` and `.tim` pulsar timing data files are available from https://zenodo.org/record/7967584. The timing astrometric data were processed using \texttt{PINT}, and the results were recorded in the file `timing_astrometric_data_updated.csv`. The VLBI positions are obtained from the literature and stored in `msp_vlbi.csv`. The calibration source positions for the millisecond pulsars are stored in `cal.csv`.
+Our Python code requires the `astropy`, `PINT`, and `uncertainties` packages. The input `.par` and `.tim` pulsar timing data files used in this project are publicly available from the NANOGrav Collaboration: [https://doi.org/10.5281/zenodo.16051178](https://doi.org/10.5281/zenodo.16051178). If you use these data, please cite them as:
+
+> The NANOGrav Collaboration, *The NANOGrav 15-Year Data Set*, Zenodo, 2025, [DOI:10.5281/zenodo.16051178](https://doi.org/10.5281/zenodo.16051178)
+
+The timing astrometric data were processed using \texttt{PINT}, and the results were recorded in the file `timing_astrometric_data_updated.csv`. The VLBI positions are obtained from the literature and stored in `msp_vlbi.csv`. The calibration source positions for the millisecond pulsars are stored in `cal.csv`.
 
 The scripts must be executed in the following order:
 
